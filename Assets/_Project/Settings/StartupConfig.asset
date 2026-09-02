@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2586d0cfc365915438ab6ec234a7e034, type: 3}
+  m_Name: StartupConfig
+  m_EditorClassIdentifier: Pivot.Runtime::Pivot.Utils.StartupConfig
+  Rig: 0
+  UseDeviceSimulatorInEditor: 1
+  Environment: 0
+  QuestTargetFrameRate: 72
+  EnableFoveatedRendering: 1
+  AnimationSpeed: 1
+  Particles: 1
+  MasterVolume: 0.8
+  MouseSensitivity: 1
+  LeftHanded: 0
+  SeedValues: 320000001e0000004600000014000000280000003c00000050000000
+  BinValues: 0a00000019000000230000002d00000037000000410000004b0000005a000000
+  OrderLessonValues: 140000001e00000028000000320000003c000000
