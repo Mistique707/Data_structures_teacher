@@ -44,13 +44,26 @@ namespace Pivot.VFX
         [Tooltip("Leave off. The material has to read as glass with no post at all.")]
         [SerializeField] PostMode _startingPost = PostMode.Off;
 
+        [Header("Editor safety")]
+        [Tooltip("F5 and F6 write to the URP Asset, which in the Editor is a file on " +
+                 "disk. Off by default so a tuning session can never leave MSAA 1x " +
+                 "committed as the project default. Builds ignore this.")]
+        [SerializeField] bool _allowPipelineEditsInEditor;
+
         static RenderTuner _instance;
 
-        readonly StringBuilder _state = new StringBuilder(96);
+        readonly StringBuilder _state = new StringBuilder(128);
 
         Camera _camera;
         UniversalAdditionalCameraData _cameraData;
         PostMode _post;
+
+        // Whatever the asset held when this component woke up, restored on the way out
+        // so a session that toggled F5/F6 leaves the project exactly as it found it.
+        UniversalRenderPipelineAsset _guarded;
+        bool _originalDepthTexture;
+        int _originalMsaa;
+        bool _pipelineTouched;
 
         public static RenderTuner Instance
         {
@@ -73,9 +86,62 @@ namespace Pivot.VFX
             _instance = this;
         }
 
+        void OnEnable()
+        {
+            RememberPipelineDefaults();
+            Application.quitting += RestorePipelineDefaults;
+        }
+
+        void OnDisable()
+        {
+            Application.quitting -= RestorePipelineDefaults;
+            RestorePipelineDefaults();
+        }
+
         void OnDestroy()
         {
             if (_instance == this) _instance = null;
+        }
+
+        void RememberPipelineDefaults()
+        {
+            _guarded = Pipeline;
+            if (_guarded == null) return;
+
+            _originalDepthTexture = _guarded.supportsCameraDepthTexture;
+            _originalMsaa = _guarded.msaaSampleCount;
+            _pipelineTouched = false;
+        }
+
+        void RestorePipelineDefaults()
+        {
+            if (_guarded == null || !_pipelineTouched) return;
+
+            _guarded.supportsCameraDepthTexture = _originalDepthTexture;
+            _guarded.msaaSampleCount = _originalMsaa;
+            _pipelineTouched = false;
+        }
+
+        /// <summary>
+        /// The URP Asset is a ScriptableObject, so in the Editor these switches write
+        /// to a file that is under version control. Refuse unless explicitly allowed.
+        /// </summary>
+        bool CanEditPipeline(out UniversalRenderPipelineAsset asset)
+        {
+            asset = Pipeline;
+            if (asset == null) return false;
+
+            if (Application.isEditor && !_allowPipelineEditsInEditor)
+            {
+                Debug.LogWarning(
+                    "RenderTuner: pipeline switches are disabled in the Editor so a tuning " +
+                    "session cannot dirty the URP Asset on disk. Tick 'Allow Pipeline Edits " +
+                    "In Editor' on this component if you really want them here; on device " +
+                    "they always work.");
+                return false;
+            }
+
+            return true;
         }
 
         void Start()
@@ -145,15 +211,19 @@ namespace Pivot.VFX
 
         public void ToggleDepthTexture()
         {
-            UniversalRenderPipelineAsset asset = Pipeline;
-            if (asset == null) return;
+            UniversalRenderPipelineAsset asset;
+            if (!CanEditPipeline(out asset)) return;
+
+            _pipelineTouched = true;
             asset.supportsCameraDepthTexture = !asset.supportsCameraDepthTexture;
         }
 
         public void CycleMsaa()
         {
-            UniversalRenderPipelineAsset asset = Pipeline;
-            if (asset == null) return;
+            UniversalRenderPipelineAsset asset;
+            if (!CanEditPipeline(out asset)) return;
+
+            _pipelineTouched = true;
 
             switch (asset.msaaSampleCount)
             {

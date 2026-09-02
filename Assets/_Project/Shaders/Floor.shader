@@ -107,6 +107,7 @@ Shader "Pivot/Floor"
             half4 frag (Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
                 float3 positionWS = input.positionWS;
 
@@ -169,6 +170,7 @@ Shader "Pivot/Floor"
             struct ShadowVaryings
             {
                 float4 positionCS : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -177,6 +179,7 @@ Shader "Pivot/Floor"
                 ShadowVaryings output = (ShadowVaryings)0;
 
                 UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 float3 positionWS = TransformObjectToWorld(input.positionOS.xyz);
@@ -203,6 +206,8 @@ Shader "Pivot/Floor"
 
             half4 ShadowFrag (ShadowVaryings input) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 return 0;
             }
             ENDHLSL
@@ -232,6 +237,7 @@ Shader "Pivot/Floor"
             struct DepthVaryings
             {
                 float4 positionCS : SV_POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -240,6 +246,7 @@ Shader "Pivot/Floor"
                 DepthVaryings output = (DepthVaryings)0;
 
                 UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
@@ -248,6 +255,8 @@ Shader "Pivot/Floor"
 
             half4 DepthFrag (DepthVaryings input) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
                 return 0;
             }
             ENDHLSL

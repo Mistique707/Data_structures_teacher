@@ -52,6 +52,7 @@ Shader "Pivot/Skybox Dusk"
             {
                 float4 positionCS : SV_POSITION;
                 float3 directionOS : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -71,12 +72,22 @@ Shader "Pivot/Skybox Dusk"
                 Varyings output = (Varyings)0;
 
                 UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
+                // TransformObjectToHClip uses the per-eye view-projection, which is
+                // selected by UNITY_SETUP_INSTANCE_ID above. Each eye therefore gets
+                // its own projection of the skybox mesh.
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
 
                 // Unity draws the skybox on a mesh centred on the camera, so the
-                // object-space position is already the view direction.
+                // object-space position is the view ray. This stays eye-correct under
+                // single pass instanced without any extra work: the attribute is the
+                // same for both eyes, but the two eyes rasterise the mesh to different
+                // screen positions, so the interpolated direction reaching a given
+                // fragment differs per eye. Explicit per-eye camera positions would add
+                // nothing, because a skybox sits at infinity and IPD produces no
+                // parallax there.
                 output.directionOS = input.positionOS.xyz;
                 return output;
             }
@@ -92,6 +103,9 @@ Shader "Pivot/Skybox Dusk"
 
             half4 frag (Varyings input) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
                 float3 direction = normalize(input.directionOS);
                 float height = direction.y;
 
