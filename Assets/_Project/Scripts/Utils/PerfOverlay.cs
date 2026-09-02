@@ -1,4 +1,5 @@
 using System.Text;
+using Pivot.VFX;
 using Unity.Profiling;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -6,20 +7,24 @@ using UnityEngine.InputSystem;
 namespace Pivot.Utils
 {
     /// <summary>
-    /// F3 toggles a frame time, draw call and allocation readout. It exists so the
-    /// performance budget can be checked at any moment rather than trusted.
+    /// F3 toggles the readout. Frame time in milliseconds is the headline, not FPS:
+    /// 72 against 71 says nothing, whereas 11.2 ms against 13.9 ms against a 13.9 ms
+    /// budget says exactly how much room is left.
     ///
-    /// The counters come from <see cref="ProfilerRecorder"/> rather than UnityStats,
-    /// because UnityStats is editor-only and the numbers that matter are the ones
-    /// coming off the headset. Recorders that a given build does not expose simply
-    /// report as unavailable instead of breaking the overlay.
+    /// Counters come from <see cref="ProfilerRecorder"/> rather than UnityStats, which
+    /// is editor-only, so these numbers are the ones the headset actually produces.
+    /// The current render configuration is printed alongside them, so a screenshot of
+    /// this overlay is self-documenting.
     /// </summary>
     public sealed class PerfOverlay : MonoBehaviour
     {
         [SerializeField] bool _visibleAtStart;
         [SerializeField] float _refreshInterval = 0.25f;
 
-        readonly StringBuilder _text = new StringBuilder(320);
+        [Tooltip("Frames kept for the percentile. 300 at 72 Hz is about four seconds.")]
+        [SerializeField] int _windowFrames = 300;
+
+        readonly StringBuilder _text = new StringBuilder(420);
 
         ProfilerRecorder _batches;
         ProfilerRecorder _setPass;
@@ -31,16 +36,25 @@ namespace Pivot.Utils
         GUIContent _content;
         bool _visible;
 
+        float[] _window;
+        int _windowCount;
+        int _windowHead;
+
         float _accumulated;
         int _frames;
-        float _fps;
-        float _worstFrameMs;
-        float _worstResetAt;
+
+        float _meanMs;
+        float _worstMs;
+        float _p95Ms;
+
+        float[] _sortScratch;
 
         void Awake()
         {
             _visible = _visibleAtStart;
             _content = new GUIContent(string.Empty);
+            _window = new float[Mathf.Max(30, _windowFrames)];
+            _sortScratch = new float[_window.Length];
         }
 
         void OnEnable()
@@ -66,26 +80,40 @@ namespace Pivot.Utils
             Keyboard keyboard = Keyboard.current;
             if (keyboard != null && keyboard.f3Key.wasPressedThisFrame) _visible = !_visible;
 
-            if (!_visible) return;
-
             float frameMs = Time.unscaledDeltaTime * 1000f;
-            if (frameMs > _worstFrameMs) _worstFrameMs = frameMs;
 
-            if (Time.unscaledTime >= _worstResetAt)
-            {
-                _worstResetAt = Time.unscaledTime + 3f;
-                _worstFrameMs = frameMs;
-            }
+            _window[_windowHead] = frameMs;
+            _windowHead = (_windowHead + 1) % _window.Length;
+            if (_windowCount < _window.Length) _windowCount++;
+
+            if (!_visible) return;
 
             _accumulated += Time.unscaledDeltaTime;
             _frames++;
             if (_accumulated < _refreshInterval) return;
 
-            _fps = _frames / _accumulated;
+            _meanMs = _accumulated / _frames * 1000f;
             _accumulated = 0f;
             _frames = 0;
 
+            ComputeWindow();
             Rebuild();
+        }
+
+        /// <summary>
+        /// Worst and 95th percentile over the rolling window. A single spike matters
+        /// more than an average on a headset, where one dropped frame is felt.
+        /// </summary>
+        void ComputeWindow()
+        {
+            if (_windowCount == 0) return;
+
+            for (int i = 0; i < _windowCount; i++) _sortScratch[i] = _window[i];
+            System.Array.Sort(_sortScratch, 0, _windowCount);
+
+            _worstMs = _sortScratch[_windowCount - 1];
+            int index = Mathf.Clamp(Mathf.CeilToInt(_windowCount * 0.95f) - 1, 0, _windowCount - 1);
+            _p95Ms = _sortScratch[index];
         }
 
         static void AppendCounter(StringBuilder into, string label, ProfilerRecorder recorder)
@@ -97,15 +125,26 @@ namespace Pivot.Utils
 
         void Rebuild()
         {
+            int target = Application.targetFrameRate;
+            float budgetMs = target > 0 ? 1000f / target : 0f;
+
             _text.Length = 0;
 
-            _text.Append("FPS ").Append(Mathf.RoundToInt(_fps));
-            _text.Append("   frame ").Append((1000f / Mathf.Max(_fps, 0.001f)).ToString("F1")).Append(" ms");
-            _text.Append("   worst ").Append(_worstFrameMs.ToString("F1")).Append(" ms\n");
+            _text.Append("frame ").Append(_meanMs.ToString("F2")).Append(" ms");
+            if (budgetMs > 0f)
+            {
+                float headroom = budgetMs - _meanMs;
+                _text.Append("   budget ").Append(budgetMs.ToString("F2")).Append(" ms");
+                _text.Append("   headroom ").Append(headroom >= 0f ? "+" : "");
+                _text.Append(headroom.ToString("F2")).Append(" ms");
+            }
 
-            _text.Append("target ").Append(Application.targetFrameRate);
-            _text.Append("   vsync ").Append(QualitySettings.vSyncCount);
-            _text.Append("   quality ").Append(QualitySettings.names[QualitySettings.GetQualityLevel()]).Append('\n');
+            _text.Append('\n');
+
+            _text.Append("p95 ").Append(_p95Ms.ToString("F2")).Append(" ms");
+            _text.Append("   worst ").Append(_worstMs.ToString("F2")).Append(" ms");
+            _text.Append("   (").Append(Mathf.RoundToInt(_meanMs > 0f ? 1000f / _meanMs : 0f)).Append(" fps)");
+            _text.Append('\n');
 
             AppendCounter(_text, "batches", _batches);
             _text.Append("   ");
@@ -118,9 +157,12 @@ namespace Pivot.Utils
             _text.Append("   gc/frame ");
             if (_gcPerFrame.Valid) _text.Append(_gcPerFrame.LastValue).Append(" B");
             else _text.Append('-');
+            _text.Append("   tweens ").Append(TweenRunner.Exists ? TweenRunner.Instance.ActiveCount : 0);
             _text.Append('\n');
 
-            _text.Append("tweens ").Append(TweenRunner.Exists ? TweenRunner.Instance.ActiveCount : 0);
+            RenderTuner tuner = RenderTuner.Instance;
+            if (tuner != null) _text.Append(tuner.DescribeState());
+            else _text.Append("quality ").Append(QualitySettings.names[QualitySettings.GetQualityLevel()]);
 
             _content.text = _text.ToString();
         }
@@ -142,10 +184,10 @@ namespace Pivot.Utils
             }
 
             const float pad = 10f;
-            Rect box = new Rect(pad, pad, 380f, 108f);
+            Rect box = new Rect(pad, pad, 430f, 126f);
 
             Color previous = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.color = new Color(0f, 0f, 0f, 0.6f);
             GUI.DrawTexture(box, Texture2D.whiteTexture);
             GUI.color = previous;
 
