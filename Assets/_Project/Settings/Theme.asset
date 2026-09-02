@@ -31,9 +31,9 @@ MonoBehaviour:
   ComparisonPath: {r: 1, g: 0.77, b: 0.24, a: 1}
   EdgeRadius: 0.045
   EdgeGradientBlend: 0.85
-  SkyTop: {r: 0.106, g: 0.118, b: 0.294, a: 1}
-  SkyHorizon: {r: 0.231, g: 0.165, b: 0.42, a: 1}
-  SkyGround: {r: 0.071, g: 0.078, b: 0.18, a: 1}
+  SkyTop: {r: 0.012, g: 0.014, b: 0.045, a: 1}
+  SkyHorizon: {r: 0.045, g: 0.03, b: 0.088, a: 1}
+  SkyGround: {r: 0.008, g: 0.009, b: 0.024, a: 1}
   FloorTint: {r: 0.129, g: 0.141, b: 0.31, a: 1}
   GridLine: {r: 0.35, g: 0.33, b: 0.62, a: 0.35}
   Label: {r: 1, g: 1, b: 1, a: 1}

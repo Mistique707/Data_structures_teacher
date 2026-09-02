@@ -106,6 +106,36 @@ namespace Pivot.Tests
                 LoadRenderer(MobileRenderer).intermediateTextureMode);
         }
 
+        /// <summary>
+        /// Every stereo macro in the hand-written shaders assumes single pass instanced.
+        /// If the Android settings block ever generates as multi pass, those macros
+        /// become dead weight and the symptom would never show up on desktop.
+        ///
+        /// The block does not exist until Android build support is installed, so this
+        /// skips rather than fails until then, and arms itself the moment it appears.
+        /// </summary>
+        [Test]
+        public void AndroidRendersSinglePassInstanced()
+        {
+            UnityEngine.XR.OpenXR.OpenXRSettings settings =
+                UnityEngine.XR.OpenXR.OpenXRSettings.GetSettingsForBuildTargetGroup(
+                    BuildTargetGroup.Android);
+
+            if (settings == null)
+            {
+                Assert.Ignore(
+                    "No Android OpenXR settings block yet. It is generated when Android " +
+                    "Build Support is installed; re-run this then.");
+                return;
+            }
+
+            Assert.AreEqual(
+                UnityEngine.XR.OpenXR.OpenXRSettings.RenderMode.SinglePassInstanced,
+                settings.renderMode,
+                "Android must render single pass instanced. Multi pass would silently " +
+                "waste every stereo macro in the hand-written shaders.");
+        }
+
         [Test]
         public void AndroidBuildsVulkanOnly()
         {

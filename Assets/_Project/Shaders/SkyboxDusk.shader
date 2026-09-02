@@ -6,8 +6,8 @@ Shader "Pivot/Skybox Dusk"
         [HDR] _HorizonColour  ("Horizon", Color) = (0.231, 0.165, 0.420, 1)
         [HDR] _GroundColour   ("Ground",  Color) = (0.071, 0.078, 0.180, 1)
 
-        _HorizonWidth ("Horizon Width", Range(0.02, 1.5)) = 0.55
-        _TopFalloff   ("Top Falloff",   Range(0.2, 4.0))  = 1.35
+        _HorizonWidth ("Horizon Width", Range(0.02, 1.5)) = 0.28
+        _TopFalloff   ("Top Falloff",   Range(0.2, 4.0))  = 0.75
         _GroundFalloff("Ground Falloff",Range(0.2, 4.0))  = 1.10
         _Exposure     ("Exposure",      Range(0.0, 2.0))  = 1.0
 

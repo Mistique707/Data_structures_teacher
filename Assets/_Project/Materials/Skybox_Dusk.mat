@@ -31,8 +31,8 @@ Material:
     - _HorizonWidth: 0.55
     - _TopFalloff: 1.35
     m_Colors:
-    - _GroundColour: {r: 0.071, g: 0.078, b: 0.18, a: 1}
-    - _HorizonColour: {r: 0.231, g: 0.165, b: 0.42, a: 1}
-    - _TopColour: {r: 0.106, g: 0.118, b: 0.294, a: 1}
+    - _GroundColour: {r: 0.008, g: 0.009, b: 0.024, a: 1}
+    - _HorizonColour: {r: 0.045, g: 0.03, b: 0.088, a: 1}
+    - _TopColour: {r: 0.012, g: 0.014, b: 0.045, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

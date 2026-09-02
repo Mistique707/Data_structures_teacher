@@ -41,9 +41,9 @@ namespace Pivot.Utils
         [Range(0f, 1f)] public float EdgeGradientBlend = 0.85f;
 
         [Header("Environment")]
-        public Color SkyTop = new Color(0.106f, 0.118f, 0.294f);
-        public Color SkyHorizon = new Color(0.231f, 0.165f, 0.420f);
-        public Color SkyGround = new Color(0.071f, 0.078f, 0.180f);
+        public Color SkyTop = new Color(0.012f, 0.014f, 0.045f);
+        public Color SkyHorizon = new Color(0.045f, 0.030f, 0.088f);
+        public Color SkyGround = new Color(0.008f, 0.009f, 0.024f);
         public Color FloorTint = new Color(0.129f, 0.141f, 0.310f);
         public Color GridLine = new Color(0.35f, 0.33f, 0.62f, 0.35f);
 
