@@ -11,15 +11,18 @@ namespace Pivot.Utils
     public sealed class ThemeSO : ScriptableObject
     {
         [Header("Node bubbles by depth")]
-        [Tooltip("Depth 0 is the root. Deeper levels wrap around once the list runs out.")]
+        [Tooltip("Depth 0 is the root. Deeper levels wrap around once the list runs out. " +
+                 "Luminance descends down the list on purpose: adjacent depths have to " +
+                 "differ in value, not only in hue, or the coding stops working in " +
+                 "peripheral vision and for a colour blind viewer.")]
         public Color[] DepthColours =
         {
-            new Color(1.00f, 0.30f, 0.37f), // coral
-            new Color(1.00f, 0.77f, 0.24f), // amber
-            new Color(0.24f, 0.84f, 0.55f), // mint
-            new Color(0.22f, 0.74f, 0.97f), // sky
-            new Color(0.66f, 0.33f, 0.97f), // violet
-            new Color(0.93f, 0.28f, 0.60f)  // magenta
+            new Color(1.00f, 0.84f, 0.42f), // 0 warm sand, luma 0.84
+            new Color(0.38f, 0.82f, 0.58f), // 1 mint, luma 0.71
+            new Color(0.98f, 0.52f, 0.44f), // 2 coral, luma 0.61
+            new Color(0.22f, 0.52f, 0.90f), // 3 sky, luma 0.48
+            new Color(0.54f, 0.28f, 0.86f), // 4 violet, luma 0.38
+            new Color(0.64f, 0.16f, 0.42f)  // 5 deep magenta, luma 0.28
         };
 
         [Header("Bubble surface")]
@@ -70,6 +73,13 @@ namespace Pivot.Utils
         public AnimationCurve Bounce = new AnimationCurve(
             new Keyframe(0f, 0f), new Keyframe(0.25f, 1f), new Keyframe(0.5f, -0.5f),
             new Keyframe(0.75f, 0.2f), new Keyframe(1f, 0f));
+
+        [Header("Punch amounts")]
+        [Tooltip("Over-scale on spawn and on a satisfying snap.")]
+        [Range(0f, 1f)] public float SpawnPunch = 0.28f;
+
+        [Tooltip("Over-scale on the pop that consumes a node. The payoff, so larger.")]
+        [Range(0f, 1.5f)] public float PopPunch = 0.55f;
 
         [Header("Timings (seconds, before the speed multiplier)")]
         public float ReflowDuration = 0.42f;

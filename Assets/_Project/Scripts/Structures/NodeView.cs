@@ -1,0 +1,194 @@
+using Pivot.Utils;
+using TMPro;
+using UnityEngine;
+
+namespace Pivot.Structures
+{
+    /// <summary>
+    /// One bubble. Owns nothing about the tree beyond the id it is currently standing
+    /// for, so the reconciler is free to hand it a different node at any time — which
+    /// is what lets a pool of these survive inserts, deletes and undo without ever
+    /// respawning and losing its animation state.
+    ///
+    /// Colour and highlight go through a MaterialPropertyBlock into the shader's
+    /// instancing buffer, so every node in the tree shares one material and one draw.
+    /// </summary>
+    public sealed class NodeView : MonoBehaviour
+    {
+        [Header("Parts")]
+        [SerializeField] Transform _body;
+        [SerializeField] MeshRenderer _renderer;
+        [SerializeField] TextMeshPro _label;
+        [SerializeField] Transform _labelPivot;
+
+        static readonly int InstanceColour = Shader.PropertyToID("_InstanceColour");
+        static readonly int InstanceHighlight = Shader.PropertyToID("_InstanceHighlight");
+
+        MaterialPropertyBlock _block;
+        Transform _transform;
+
+        Vector3 _basePosition;
+        Vector3 _baseScale = Vector3.one;
+        Color _colour = Color.white;
+        Color _highlight;
+        float _highlightAmount;
+        float _bobPhase;
+        int _value = int.MinValue;
+
+        public int NodeId { get; private set; }
+
+        public bool InUse { get; private set; }
+
+        public Transform Body
+        {
+            get { return _body != null ? _body : _transform; }
+        }
+
+        public Vector3 BasePosition
+        {
+            get { return _basePosition; }
+        }
+
+        void Awake()
+        {
+            EnsureReady();
+
+            // Desynchronised so a tree full of bubbles breathes as a crowd rather than
+            // pulsing in lockstep, which reads as a glitch.
+            _bobPhase = Random.value * Mathf.PI * 2f;
+        }
+
+        /// <summary>
+        /// Awake does not run when a prefab is instantiated in edit mode, and the scene
+        /// authoring tools drive these views directly, so state is created on demand
+        /// rather than assumed.
+        /// </summary>
+        void EnsureReady()
+        {
+            if (_transform == null) _transform = transform;
+            if (_block == null) _block = new MaterialPropertyBlock();
+        }
+
+        public void Acquire(int nodeId, int value, Vector3 position, Color colour, ThemeSO theme)
+        {
+            NodeId = nodeId;
+            InUse = true;
+
+            EnsureReady();
+            _basePosition = position;
+            _transform.localPosition = position;
+
+            SetValue(value);
+            SetColour(colour);
+            SetHighlight(theme != null ? theme.Held : Color.white, 0f);
+
+            gameObject.SetActive(true);
+        }
+
+        public void Release()
+        {
+            InUse = false;
+            NodeId = 0;
+            _value = int.MinValue;
+            gameObject.SetActive(false);
+        }
+
+        public void SetValue(int value)
+        {
+            if (_value == value) return;
+            _value = value;
+
+            // Only touches the mesh when the number genuinely changed. A reconcile that
+            // moves nodes around should never rebuild text it did not alter.
+            if (_label != null) _label.SetText("{0}", value);
+        }
+
+        public void SetColour(Color colour)
+        {
+            _colour = colour;
+            PushBlock();
+        }
+
+        public void SetHighlight(Color tint, float amount)
+        {
+            _highlight = tint;
+            _highlightAmount = Mathf.Clamp01(amount);
+            PushBlock();
+        }
+
+        void PushBlock()
+        {
+            if (_renderer == null) return;
+            EnsureReady();
+
+            _renderer.GetPropertyBlock(_block);
+
+            // Alpha carries "a block was written" for the colour, and the highlight
+            // strength for the tint, which keeps both inside one instanced vector.
+            _block.SetColor(InstanceColour, new Color(_colour.r, _colour.g, _colour.b, 1f));
+            _block.SetColor(InstanceHighlight,
+                new Color(_highlight.r, _highlight.g, _highlight.b, _highlightAmount));
+
+            _renderer.SetPropertyBlock(_block);
+        }
+
+        /// <summary>Where the reconciler wants this node to sit once it has finished moving.</summary>
+        public void SetBasePosition(Vector3 position)
+        {
+            _basePosition = position;
+        }
+
+        public void SetLocalPosition(Vector3 position)
+        {
+            EnsureReady();
+            _transform.localPosition = position;
+        }
+
+        public void SetBaseScale(Vector3 scale)
+        {
+            _baseScale = scale;
+        }
+
+        /// <summary>
+        /// Idle motion, driven from the one tween runner rather than an Update on every
+        /// node. Applied on top of whatever the layout and any active tween decided, so
+        /// it never fights them.
+        /// </summary>
+        public void ApplyIdle(float time, ThemeSO theme)
+        {
+            if (theme == null || _body == null) return;
+
+            float bob = Mathf.Sin(time * theme.IdleBobSpeed + _bobPhase) * theme.IdleBobAmplitude;
+            float breathe = 1f + Mathf.Sin(time * theme.BreatheSpeed + _bobPhase) * theme.BreatheAmplitude;
+
+            _body.localPosition = new Vector3(0f, bob, 0f);
+            _body.localScale = _baseScale * breathe;
+        }
+
+        /// <summary>Turn the label to the viewer. Called once per frame by the view, for all nodes.</summary>
+        public void FaceLabel(Vector3 viewerPosition, float pushDistance)
+        {
+            if (_labelPivot == null) return;
+            EnsureReady();
+
+            Vector3 anchor = _transform.position;
+            Vector3 toViewer = viewerPosition - anchor;
+            if (toViewer.sqrMagnitude < 1e-6f) return;
+
+            toViewer.Normalize();
+            _labelPivot.position = anchor + toViewer * pushDistance;
+            _labelPivot.rotation = Quaternion.LookRotation(-toViewer, Vector3.up);
+        }
+
+#if UNITY_EDITOR
+        /// <summary>Used by the authoring tool so a prefab can be wired without hand-dragging.</summary>
+        public void EditorBind(Transform body, MeshRenderer renderer, TextMeshPro label, Transform labelPivot)
+        {
+            _body = body;
+            _renderer = renderer;
+            _label = label;
+            _labelPivot = labelPivot;
+        }
+#endif
+    }
+}

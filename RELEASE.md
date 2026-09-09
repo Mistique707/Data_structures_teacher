@@ -45,7 +45,20 @@ not the shipping player.
 
 ---
 
-## 3. Strip `PerfOverlay` from release builds
+## 3. Strip `BubbleTuner` from release builds
+
+**File:** `Assets/_Project/Scripts/VFX/BubbleTuner.cs`
+
+Binds F7-F10 and writes to the **shared** `Bubble.mat` and the node label material.
+Restores originals on disable and on quit, and refuses to touch materials in the Editor
+unless `_allowMaterialEditsInEditor` is ticked — none of which belongs in a shipping
+build. It also draws an `OnGUI` overlay.
+
+Remove from scenes or wrap in `#if DEVELOPMENT_BUILD || UNITY_EDITOR`.
+
+---
+
+## 4. Strip `PerfOverlay` from release builds
 
 **File:** `Assets/_Project/Scripts/Utils/PerfOverlay.cs`
 
@@ -57,7 +70,7 @@ Remove from scenes or wrap in `#if DEVELOPMENT_BUILD || UNITY_EDITOR`.
 
 ---
 
-## 4. Development Build flags off
+## 5. Development Build flags off
 
 **Location:** Build Profiles → Android → **Build Settings**
 
@@ -73,7 +86,7 @@ was measured.
 
 ---
 
-## 5. Player settings for release
+## 6. Player settings for release
 
 **Location:** Project Settings → Player → Android
 
@@ -87,7 +100,7 @@ was measured.
 
 ---
 
-## 6. Remove authoring-only editor tooling
+## 7. Remove authoring-only editor tooling
 
 Temporary `[MenuItem]` scene-authoring tools are deleted as soon as they have run — the
 scene file is the source of truth, not the generator. Before release, confirm
@@ -96,7 +109,7 @@ nothing under `Pivot.Editor` is referenced from runtime code.
 
 ---
 
-## 7. Confirm the deferred passthrough install
+## 8. Confirm the deferred passthrough install
 
 `com.unity.xr.meta-openxr` is **not installed** during early development, by choice.
 Before any mixed-reality release it has to go in, along with:
@@ -108,10 +121,39 @@ Before any mixed-reality release it has to go in, along with:
 
 ---
 
+## 9. The look has not had a device pass — two of them are outstanding
+
+**This is a correctness item, not a polish one.** Every value in `Bubble.shader`,
+`SkyboxDusk.shader` and `ThemeSO` was tuned against sRGB screenshots on a desktop
+monitor. A Quest panel is dimmer and lower in contrast than a monitor, so a rim, a
+glint and a guard that read correctly in a PNG will not necessarily read correctly
+through the lenses. **Treat the committed values as a starting point.**
+
+Two separate passes are needed, and the second is not a touch-up of the first:
+
+- [ ] **Skybox pass.** Bubbles over the authored dusk gradient. This is closest to what
+      was tuned, but on panel rather than monitor.
+- [ ] **Passthrough pass.** Bubbles over a *lit room*, which is a completely different
+      and uncontrolled background: brighter, warmer, and varying with the user's
+      lighting. The edge darkening that separates overlapping orbs against a dark sky
+      may separate them poorly against a pale wall, and the legibility guard has to be
+      re-checked against light backgrounds. Expect a genuinely different value set —
+      budget for `ThemeSO` carrying two profiles rather than one.
+
+Use `BubbleTuner` (F7-F10) to do both in-headset in one session each, then `F9` to dump
+the values and paste them back. The dump is also written to
+`Application.persistentDataPath/bubble-tuning.txt`, so it can be pulled with
+`adb pull` rather than read off a log.
+
+Only after both passes should the values in the shader Properties block be considered
+authored rather than provisional.
+
+---
+
 ## Quick audit
 
 ```bash
-grep -rn "RenderTuner\|PerfOverlay" Assets/_Project/Scenes/ Assets/_Project/Prefabs/
+grep -rn "RenderTuner\|BubbleTuner\|PerfOverlay" Assets/_Project/Scenes/ Assets/_Project/Prefabs/
 ```
 
-Should return nothing once items 2 and 3 are done.
+Should return nothing once items 2, 3 and 4 are done.

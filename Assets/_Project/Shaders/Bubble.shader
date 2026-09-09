@@ -176,9 +176,14 @@ Shader "Pivot/Bubble"
                 // ---- body -------------------------------------------------------
                 // Lighter towards the top, deeper towards the bottom. Object space, so
                 // the gradient belongs to the bubble rather than to the world.
+                // The lift is multiplicative, not additive. Adding a constant to every
+                // channel drags dark colours towards white and the deeper depths turn
+                // milky, which destroys the depth coding the tree is read by; scaling
+                // keeps the hue and only changes the brightness.
                 half vertical = input.normalOS.y * 0.5 + 0.5;
                 half3 body = baseColour;
-                body = lerp(body, saturate(body + _TopLift), smoothstep(0.45, 1.0, vertical));
+                body = lerp(body, saturate(body * (1.0 + _TopLift * 2.0)),
+                            smoothstep(0.45, 1.0, vertical));
                 body = lerp(body, body * (1.0 - _BottomSink), smoothstep(0.55, 0.0, vertical));
                 body = SaturateColour(body, _Saturate);
 
