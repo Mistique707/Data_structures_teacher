@@ -9,6 +9,11 @@ namespace Pivot.Structures
     /// The tube is a unit cylinder running -1..1 in object Y, so the stretch is a scale
     /// and the shader can read the fraction along the edge straight from the position.
     /// </summary>
+    /// <remarks>
+    /// ExecuteAlways for the same reason as NodeView: property blocks are not
+    /// serialised, so the authored gradient has to be restored when the object wakes.
+    /// </remarks>
+    [ExecuteAlways]
     public sealed class EdgeView : MonoBehaviour
     {
         [SerializeField] MeshRenderer _renderer;
@@ -25,11 +30,14 @@ namespace Pivot.Structures
         static readonly int InstancePulse = Shader.PropertyToID("_InstancePulse");
         static readonly int InstancePulsePos = Shader.PropertyToID("_InstancePulsePos");
 
+        [Header("Authored state")]
+        [Tooltip("Serialised so the authored scene keeps its gradient without Play.")]
+        [SerializeField] Color _colourA = Color.white;
+        [SerializeField] Color _colourB = Color.white;
+
         MaterialPropertyBlock _block;
         Transform _transform;
 
-        Color _colourA = Color.white;
-        Color _colourB = Color.white;
         float _pulsePosition = -0.5f;
         float _pulseStrength;
 
@@ -38,6 +46,20 @@ namespace Pivot.Structures
         public int ChildId { get; private set; }
 
         public bool InUse { get; private set; }
+
+        void OnEnable()
+        {
+            EnsureReady();
+            PushBlock();
+        }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            EnsureReady();
+            PushBlock();
+        }
+#endif
 
         void Awake()
         {

@@ -13,6 +13,15 @@ namespace Pivot.Structures
     /// Colour and highlight go through a MaterialPropertyBlock into the shader's
     /// instancing buffer, so every node in the tree shares one material and one draw.
     /// </summary>
+    /// <remarks>
+    /// ExecuteAlways because a MaterialPropertyBlock is runtime state on the Renderer
+    /// and is never serialised into a scene. Without this, an authored scene would
+    /// reload with every node showing the material's fallback colour, and the depth
+    /// coding would only appear once you pressed Play. The colour is therefore stored
+    /// in a serialised field and pushed back into the block whenever the object wakes,
+    /// in the Editor as well as at run time.
+    /// </remarks>
+    [ExecuteAlways]
     public sealed class NodeView : MonoBehaviour
     {
         [Header("Parts")]
@@ -20,6 +29,13 @@ namespace Pivot.Structures
         [SerializeField] MeshRenderer _renderer;
         [SerializeField] TextMeshPro _label;
         [SerializeField] Transform _labelPivot;
+
+        [Header("Authored state")]
+        [Tooltip("Serialised so the authored scene keeps its depth colour without Play.")]
+        [SerializeField] Color _colour = Color.white;
+
+        [Tooltip("Resting offset of the label towards the viewer, before billboarding.")]
+        [SerializeField] Vector3 _labelOffset = new Vector3(0f, 0f, -0.154f);
 
         static readonly int InstanceColour = Shader.PropertyToID("_InstanceColour");
         static readonly int InstanceHighlight = Shader.PropertyToID("_InstanceHighlight");
@@ -29,7 +45,6 @@ namespace Pivot.Structures
 
         Vector3 _basePosition;
         Vector3 _baseScale = Vector3.one;
-        Color _colour = Color.white;
         Color _highlight;
         float _highlightAmount;
         float _bobPhase;
@@ -47,6 +62,36 @@ namespace Pivot.Structures
         public Vector3 BasePosition
         {
             get { return _basePosition; }
+        }
+
+        /// <summary>The colour saved with the scene, before any runtime highlight.</summary>
+        public Color AuthoredColour
+        {
+            get { return _colour; }
+        }
+
+        void OnEnable()
+        {
+            EnsureReady();
+            PushBlock();
+            RestLabel();
+        }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            EnsureReady();
+            PushBlock();
+            RestLabel();
+        }
+#endif
+
+        /// <summary>Park the label just in front of the bubble so it reads without billboarding.</summary>
+        void RestLabel()
+        {
+            if (_labelPivot == null) return;
+            _labelPivot.localPosition = _labelOffset;
+            _labelPivot.localRotation = Quaternion.identity;
         }
 
         void Awake()

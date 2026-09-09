@@ -175,6 +175,49 @@ namespace Pivot.Tests
             }
         }
 
+        /// <summary>
+        /// A MaterialPropertyBlock is not serialised into a scene, so an authored
+        /// colour has to live in a serialised field and be restored on wake. This
+        /// caught every node reloading as the same fallback blue.
+        /// </summary>
+        [Test]
+        public void AuthoredNodesKeepDistinctDepthColours()
+        {
+            List<NodeView> nodes = FindAll<NodeView>(_scene);
+
+            HashSet<Color> colours = new HashSet<Color>();
+            for (int i = 0; i < nodes.Count; i++) colours.Add(nodes[i].AuthoredColour);
+
+            Assert.GreaterOrEqual(colours.Count, 3,
+                "Seven nodes across three depths should carry at least three distinct " +
+                "colours. All one colour means the property block was never persisted.");
+        }
+
+        /// <summary>
+        /// The number is the product. If the label pivot sits at the node centre it is
+        /// inside the sphere and invisible until something billboards it at run time.
+        /// </summary>
+        [Test]
+        public void AuthoredNodeLabelsSitOutsideTheirBubbles()
+        {
+            List<NodeView> nodes = FindAll<NodeView>(_scene);
+            Assert.Greater(nodes.Count, 0);
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                TMPro.TextMeshPro label = nodes[i].GetComponentInChildren<TMPro.TextMeshPro>(true);
+                Assert.IsNotNull(label, "No label under '" + nodes[i].name + "'.");
+
+                float distance = Vector3.Distance(
+                    label.transform.position, nodes[i].transform.position);
+
+                Assert.Greater(distance, 0.1f,
+                    "Label on '" + nodes[i].name + "' is buried inside the bubble.");
+
+                Assert.IsNotEmpty(label.text, "Label on '" + nodes[i].name + "' has no number.");
+            }
+        }
+
         [Test]
         public void HierarchyIsGroupedRatherThanDumpedFlatAtRoot()
         {
