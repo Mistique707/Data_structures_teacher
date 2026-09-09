@@ -3,6 +3,7 @@
     "rootNamespace": "Pivot.Tests",
     "references": [
         "Pivot.Core",
+        "Pivot.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
         "Unity.RenderPipelines.Core.Runtime",

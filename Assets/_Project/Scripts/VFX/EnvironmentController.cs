@@ -46,6 +46,16 @@ namespace Pivot.VFX
             get { return _applied; }
         }
 
+#if UNITY_EDITOR
+        /// <summary>Used by the scene authoring tool. Editor only, never at run time.</summary>
+        public void EditorBind(ThemeSO theme, Material skybox, GameObject[] skyboxOnly)
+        {
+            _theme = theme;
+            _skyboxMaterial = skybox;
+            _skyboxOnly = skyboxOnly;
+        }
+#endif
+
         void OnEnable()
         {
             Settings.Changed += OnSettingsChanged;

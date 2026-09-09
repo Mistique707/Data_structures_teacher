@@ -42,6 +42,16 @@ namespace Pivot.VFX
             Apply();
         }
 
+#if UNITY_EDITOR
+        /// <summary>Used by the scene authoring tool. Editor only, never at run time.</summary>
+        public void EditorBind(ThemeSO theme, Light key, Light fill)
+        {
+            _theme = theme;
+            _key = key;
+            _fill = fill;
+        }
+#endif
+
         public void Apply()
         {
             if (_key != null)
