@@ -35,6 +35,12 @@ namespace Pivot.Interaction
 
         float _holdDistance;
 
+        // Present on the desktop rig, absent on the VR rig. When absent the cursor is
+        // treated as always captured and never suppressed, which is exactly what a
+        // controller ray wants. This is not a mode branch: it asks the thing that owns
+        // the cursor, and a rig with no cursor has nothing to say.
+        DesktopLocomotion _cursorOwner;
+
         public float HoldDistance
         {
             get { return _holdDistance; }
@@ -45,6 +51,7 @@ namespace Pivot.Interaction
             base.Awake();
 
             if (_camera == null) _camera = GetComponentInParent<Camera>();
+            _cursorOwner = GetComponentInParent<DesktopLocomotion>();
             _holdDistance = _defaultHoldDistance;
 
             // The base interactor reads its select signal from this reader. Driving it
@@ -90,7 +97,12 @@ namespace Pivot.Interaction
             bool? grabbing = _forcedGrab;
             if (!grabbing.HasValue && actions != null && actions.Grab != null)
             {
-                grabbing = actions.Grab.IsPressed();
+                bool pressed = actions.Grab.IsPressed();
+
+                // A press that recaptured the cursor is spent; it must not also grab.
+                if (_cursorOwner != null && _cursorOwner.GrabSuppressed) pressed = false;
+
+                grabbing = pressed;
             }
 
             // Only on a change, never every frame. QueueManualState makes the value
@@ -135,7 +147,9 @@ namespace Pivot.Interaction
         /// </summary>
         Ray CursorRay()
         {
-            Vector2 screen = Cursor.lockState == CursorLockMode.Locked
+            bool captured = _cursorOwner == null || _cursorOwner.Captured;
+
+            Vector2 screen = captured
                 ? new Vector2(Screen.width * 0.5f, Screen.height * 0.5f)
                 : CursorPosition();
 

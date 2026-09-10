@@ -74,10 +74,32 @@ namespace Pivot.Interaction
         Vector2? _forcedMove;
         float _forcedLift;
 
+        // Owned, never read back from Cursor.lockState. The OS value is written as a
+        // side effect but is not the source of truth: it never reads Locked in batch
+        // mode and the Editor Game view can override it at any time.
+        bool _captured;
+        bool _suppressGrabUntilRelease;
+
         /// <summary>True while the mouse is steering the view.</summary>
         public bool Looking
         {
-            get { return Cursor.lockState == CursorLockMode.Locked; }
+            get { return _captured; }
+        }
+
+        /// <summary>Whether the cursor is captured. The interactor aims from screen centre when it is.</summary>
+        public bool Captured
+        {
+            get { return _captured; }
+        }
+
+        /// <summary>
+        /// True from the click that recaptured the cursor until that button is released.
+        /// A click spent on recapture must not also pick something up, and the only way
+        /// to make that true is for the interactor to ask.
+        /// </summary>
+        public bool GrabSuppressed
+        {
+            get { return _suppressGrabUntilRelease; }
         }
 
         void Awake()
@@ -125,17 +147,26 @@ namespace Pivot.Interaction
                 return;
             }
 
-            // Clicking back into the view recaptures it. Grab is on the same button, but
-            // a click that recaptures should not also grab, so this consumes it.
-            if (Cursor.lockState != CursorLockMode.Locked &&
-                actions.Grab != null && actions.Grab.WasPressedThisFrame())
+            if (actions.Grab == null) return;
+
+            // The suppression lasts exactly as long as the recapturing press.
+            if (_suppressGrabUntilRelease && !actions.Grab.IsPressed())
             {
+                _suppressGrabUntilRelease = false;
+            }
+
+            // Clicking back into the view recaptures it. Grab is on the same button, so
+            // the press is flagged and the interactor declines to select on it.
+            if (!_captured && actions.Grab.WasPressedThisFrame())
+            {
+                _suppressGrabUntilRelease = true;
                 SetCursor(true);
             }
         }
 
-        static void SetCursor(bool locked)
+        void SetCursor(bool locked)
         {
+            _captured = locked;
             Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
             Cursor.visible = !locked;
         }
