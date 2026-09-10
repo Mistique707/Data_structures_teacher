@@ -24,6 +24,22 @@ namespace Pivot.UI
         bool _visible;
         bool _dirty = true;
 
+        public bool IsVisible
+        {
+            get { return _visible; }
+        }
+
+        /// <summary>The rendered rows, so a test can check what the overlay claims.</summary>
+        public string CurrentText
+        {
+            get
+            {
+                PivotActions actions = PivotActions.Instance;
+                if (actions != null && _dirty) Rebuild(actions);
+                return _text.ToString();
+            }
+        }
+
         void Awake()
         {
             _visible = _visibleAtStart;
@@ -57,7 +73,9 @@ namespace Pivot.UI
             Row("Look (toggle)", actions.ToggleLook);
             Row("Grab / release", actions.Grab);
             Row("Push / pull held", actions.Push);
-            Row("Rotate held", actions.RotateHeld);
+            // RotateHeld (Q/E) is bound and reserved for the BST rotation, which is not
+            // built yet. It is deliberately not listed until something consumes it: a
+            // help screen that names a key that does nothing is worse than a gap.
             Row("Frame the tree", actions.FrameTree);
             Row("Step animation", actions.Step);
             Row("Release cursor", actions.Menu);
