@@ -31,6 +31,10 @@ namespace Pivot.Structures
         [SerializeField] Transform _labelPivot;
 
         [Header("Authored state")]
+        [Tooltip("Model id this view stands for. Serialised so the authored scene can be " +
+                 "reconciled against a model rather than rebuilt.")]
+        [SerializeField] int _nodeId;
+
         [Tooltip("Serialised so the authored scene keeps its depth colour without Play.")]
         [SerializeField] Color _colour = Color.white;
 
@@ -42,14 +46,25 @@ namespace Pivot.Structures
 
         Vector3 _basePosition;
         Vector3 _baseScale = Vector3.one;
+        bool _baseScaleCaptured;
         Color _highlight;
         float _highlightAmount;
         float _bobPhase;
         int _value = int.MinValue;
 
-        public int NodeId { get; private set; }
+        public int NodeId
+        {
+            get { return _nodeId; }
+        }
 
         public bool InUse { get; private set; }
+
+        /// <summary>
+        /// While true, idle bob and breathing leave this node alone. Set while it is
+        /// being carried, so the grab tweens own the scale channel without the idle
+        /// writing over them every frame.
+        /// </summary>
+        public bool IdleSuspended { get; set; }
 
         public Transform Body
         {
@@ -99,11 +114,29 @@ namespace Pivot.Structures
         {
             if (_transform == null) _transform = transform;
             if (_block == null) _block = new MaterialPropertyBlock();
+
+            // The body carries the authored size of the mesh, so that is the scale
+            // everything animates around. Assuming one here inflated every node.
+            if (!_baseScaleCaptured && _body != null)
+            {
+                _baseScale = _body.localScale;
+                _baseScaleCaptured = true;
+            }
+        }
+
+        /// <summary>The body's authored scale, which idle and grab animate around.</summary>
+        public Vector3 RestScale
+        {
+            get
+            {
+                EnsureReady();
+                return _baseScale;
+            }
         }
 
         public void Acquire(int nodeId, int value, Vector3 position, Color colour, ThemeSO theme)
         {
-            NodeId = nodeId;
+            _nodeId = nodeId;
             InUse = true;
 
             EnsureReady();
@@ -120,7 +153,7 @@ namespace Pivot.Structures
         public void Release()
         {
             InUse = false;
-            NodeId = 0;
+            _nodeId = 0;
             _value = int.MinValue;
             gameObject.SetActive(false);
         }
@@ -179,6 +212,7 @@ namespace Pivot.Structures
         public void SetBaseScale(Vector3 scale)
         {
             _baseScale = scale;
+            _baseScaleCaptured = true;
         }
 
         /// <summary>
@@ -188,7 +222,7 @@ namespace Pivot.Structures
         /// </summary>
         public void ApplyIdle(float time, ThemeSO theme)
         {
-            if (theme == null || _body == null) return;
+            if (theme == null || _body == null || IdleSuspended) return;
 
             float bob = Mathf.Sin(time * theme.IdleBobSpeed + _bobPhase) * theme.IdleBobAmplitude;
             float breathe = 1f + Mathf.Sin(time * theme.BreatheSpeed + _bobPhase) * theme.BreatheAmplitude;

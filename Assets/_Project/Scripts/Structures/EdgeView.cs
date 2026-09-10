@@ -31,6 +31,11 @@ namespace Pivot.Structures
         static readonly int InstancePulsePos = Shader.PropertyToID("_InstancePulsePos");
 
         [Header("Authored state")]
+        [Tooltip("The two node ids this edge spans. Serialised for the same reason as " +
+                 "NodeView.NodeId: the saved scene has to be reconcilable.")]
+        [SerializeField] int _parentId;
+        [SerializeField] int _childId;
+
         [Tooltip("Serialised so the authored scene keeps its gradient without Play.")]
         [SerializeField] Color _colourA = Color.white;
         [SerializeField] Color _colourB = Color.white;
@@ -41,9 +46,15 @@ namespace Pivot.Structures
         float _pulsePosition = -0.5f;
         float _pulseStrength;
 
-        public int ParentId { get; private set; }
+        public int ParentId
+        {
+            get { return _parentId; }
+        }
 
-        public int ChildId { get; private set; }
+        public int ChildId
+        {
+            get { return _childId; }
+        }
 
         public bool InUse { get; private set; }
 
@@ -77,8 +88,8 @@ namespace Pivot.Structures
         {
             EnsureReady();
 
-            ParentId = parentId;
-            ChildId = childId;
+            _parentId = parentId;
+            _childId = childId;
             InUse = true;
             SetPulse(-0.5f, 0f);
             gameObject.SetActive(true);
@@ -87,8 +98,8 @@ namespace Pivot.Structures
         public void Release()
         {
             InUse = false;
-            ParentId = 0;
-            ChildId = 0;
+            _parentId = 0;
+            _childId = 0;
             gameObject.SetActive(false);
         }
 

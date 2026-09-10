@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7007415024527417908}
   - component: {fileID: 201847117501372171}
   - component: {fileID: 1596163792023922947}
+  - component: {fileID: 5058343004731949962}
   m_Layer: 0
   m_Name: Node
   m_TagString: Untagged
@@ -74,6 +75,7 @@ MonoBehaviour:
   _renderer: {fileID: 5098597356480535155}
   _label: {fileID: 3101870407041647635}
   _labelPivot: {fileID: 6893155070094304903}
+  _nodeId: 0
   _colour: {r: 1, g: 1, b: 1, a: 1}
 --- !u!54 &201847117501372171
 Rigidbody:
@@ -192,12 +194,12 @@ MonoBehaviour:
   m_AngularVelocityScale: 1
   m_TrackPosition: 1
   m_SmoothPosition: 1
-  m_SmoothPositionAmount: 12
-  m_TightenPosition: 0.6
+  m_SmoothPositionAmount: 16
+  m_TightenPosition: 0.8
   m_TrackRotation: 1
-  m_SmoothRotation: 0
-  m_SmoothRotationAmount: 8
-  m_TightenRotation: 0.1
+  m_SmoothRotation: 1
+  m_SmoothRotationAmount: 14
+  m_TightenRotation: 0.8
   m_TrackScale: 1
   m_SmoothScale: 0
   m_SmoothScaleAmount: 8
@@ -232,6 +234,27 @@ MonoBehaviour:
   m_LimitAngularVelocity: 0
   m_MaxLinearVelocityDelta: 10
   m_MaxAngularVelocityDelta: 20
+--- !u!114 &5058343004731949962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 362248931774162383}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8e8d53399530f743bd48e0363c6ad52, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Pivot.Runtime::Pivot.Interaction.NodeGrabFeel
+  _theme: {fileID: 11400000, guid: 728dd1c90e175bd4bbb8df32adf3492b, type: 2}
+  _view: {fileID: 7007415024527417908}
+  _squash: 0.26
+  _squashDuration: 0.14
+  _heldScale: 1.12
+  _heldTint: 0.35
+  _releasePunch: 0.34
+  _releaseDuration: 0.42
+  _uprightDuration: 0.45
 --- !u!1 &2098801523394542127
 GameObject:
   m_ObjectHideFlags: 0

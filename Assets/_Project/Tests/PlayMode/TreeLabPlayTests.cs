@@ -143,7 +143,7 @@ namespace Pivot.PlayTests
             yield return LoadLab();
 
             MouseRayInteractor interactor =
-                Object.FindFirstObjectByType<MouseRayInteractor>();
+                Object.FindAnyObjectByType<MouseRayInteractor>();
             Assert.IsNotNull(interactor, "No MouseRayInteractor in the running scene.");
             Assert.IsTrue(interactor.isActiveAndEnabled, "The interactor is not enabled.");
 
@@ -170,7 +170,7 @@ namespace Pivot.PlayTests
         {
             yield return LoadLab();
 
-            DesktopLocomotion locomotion = Object.FindFirstObjectByType<DesktopLocomotion>();
+            DesktopLocomotion locomotion = Object.FindAnyObjectByType<DesktopLocomotion>();
             Assert.IsNotNull(locomotion, "No desktop locomotion in the running scene.");
 
             Vector3 before = locomotion.transform.position;
@@ -179,8 +179,20 @@ namespace Pivot.PlayTests
             // fast as it can, so twenty frames can be two milliseconds of simulation and
             // says nothing about whether movement works.
             const float seconds = 0.6f;
+            float startTime = Time.time;
+            int frames = 0;
+            float peakSpeed = 0f;
+
             locomotion.DriveForTest(new Vector2(0f, 1f), 0f);
-            yield return new WaitForSeconds(seconds);
+            while (Time.time - startTime < seconds)
+            {
+                frames++;
+                CharacterController live = locomotion.GetComponent<CharacterController>();
+                if (live != null) peakSpeed = Mathf.Max(peakSpeed, live.velocity.magnitude);
+                yield return null;
+            }
+
+            float elapsed = Time.time - startTime;
             locomotion.DriveForTest(Vector2.zero, 0f);
 
             float travelled = Vector3.Distance(before, locomotion.transform.position);
@@ -188,8 +200,16 @@ namespace Pivot.PlayTests
             // A 2.6 m/s walk with a 0.09 s ramp covers well over a metre in 0.6 s. Half a
             // metre is a floor loose enough to survive a slow machine and still fail hard
             // if the input path is disconnected.
+            CharacterController controller = locomotion.GetComponent<CharacterController>();
+            string diagnosis = controller == null
+                ? " (no CharacterController)"
+                : " (elapsed=" + elapsed + "s over " + frames + " frames, peak speed=" +
+                  peakSpeed + " m/s, grounded=" + controller.isGrounded +
+                  ", flags=" + controller.collisionFlags +
+                  ", pos=" + locomotion.transform.position + ")";
+
             Assert.Greater(travelled, 0.5f,
-                "Holding forward for " + seconds + " s moved the rig " + travelled + " m.");
+                "Holding forward for " + seconds + " s moved the rig " + travelled + " m." + diagnosis);
 
             AssertNoErrors();
         }
@@ -199,7 +219,7 @@ namespace Pivot.PlayTests
         {
             yield return LoadLab();
 
-            DesktopLocomotion locomotion = Object.FindFirstObjectByType<DesktopLocomotion>();
+            DesktopLocomotion locomotion = Object.FindAnyObjectByType<DesktopLocomotion>();
             Camera camera = RigManager.Instance.ActiveCamera;
             Assert.IsNotNull(locomotion);
             Assert.IsNotNull(camera);

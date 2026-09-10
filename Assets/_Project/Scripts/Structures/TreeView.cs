@@ -72,6 +72,40 @@ namespace Pivot.Structures
 
             _nodePool = new ComponentPool<NodeView>(_nodePrefab, _nodeRoot, _prewarmNodes);
             _edgePool = new ComponentPool<EdgeView>(_edgePrefab, _edgeRoot, _prewarmEdges);
+
+            AdoptAuthoredScene();
+        }
+
+        /// <summary>
+        /// Takes ownership of node and edge views that were authored into the scene
+        /// rather than spawned from the pool.
+        ///
+        /// The seed tree exists as real GameObjects saved in the scene, which is the
+        /// point, but that means this view has never seen them. Registering them by
+        /// their serialised ids is what lets edges follow their nodes from the first
+        /// frame, and is the same registry a live model will reconcile against later.
+        /// </summary>
+        public void AdoptAuthoredScene()
+        {
+            NodeView[] nodes = _nodeRoot.GetComponentsInChildren<NodeView>(true);
+            for (int i = 0; i < nodes.Length; i++)
+            {
+                if (nodes[i].NodeId == 0) continue;
+                _nodesById[nodes[i].NodeId] = nodes[i];
+            }
+
+            EdgeView[] edges = _edgeRoot.GetComponentsInChildren<EdgeView>(true);
+            for (int i = 0; i < edges.Length; i++)
+            {
+                if (edges[i].ParentId == 0 || edges[i].ChildId == 0) continue;
+                _edgesByPair[PairKey(edges[i].ParentId, edges[i].ChildId)] = edges[i];
+            }
+
+            if (nodes.Length > 0 || edges.Length > 0)
+            {
+                Debug.Log("[Pivot] TreeView adopted " + _nodesById.Count + " authored node(s) and " +
+                          _edgesByPair.Count + " edge(s).");
+            }
         }
 
         /// <summary>The transform labels turn to face. Set by the rig once it knows which one won.</summary>
@@ -276,25 +310,17 @@ namespace Pivot.Structures
         {
             _idleTime += Time.deltaTime;
 
-            IReadOnlyList<NodeView> nodes = _nodePool.Live;
-            for (int i = 0; i < nodes.Count; i++)
+            bool hasViewer = _viewer != null;
+            Vector3 viewerPosition = hasViewer ? _viewer.position : Vector3.zero;
+            float push = _nodeDiameter * _labelPush;
+
+            foreach (KeyValuePair<int, NodeView> pair in _nodesById)
             {
-                NodeView node = nodes[i];
-                if (!node.InUse) continue;
+                NodeView node = pair.Value;
+                if (node == null) continue;
+
                 node.ApplyIdle(_idleTime, _theme);
-            }
-
-            if (_viewer != null)
-            {
-                Vector3 viewerPosition = _viewer.position;
-                float push = _nodeDiameter * _labelPush;
-
-                for (int i = 0; i < nodes.Count; i++)
-                {
-                    NodeView node = nodes[i];
-                    if (!node.InUse) continue;
-                    node.FaceLabel(viewerPosition, push);
-                }
+                if (hasViewer) node.FaceLabel(viewerPosition, push);
             }
 
             foreach (KeyValuePair<long, EdgeView> pair in _edgesByPair)
@@ -306,7 +332,12 @@ namespace Pivot.Structures
                 if (!_nodesById.TryGetValue(edge.ParentId, out parent)) continue;
                 if (!_nodesById.TryGetValue(edge.ChildId, out child)) continue;
 
-                edge.Span(parent.transform.localPosition, child.transform.localPosition, NodeRadius);
+                // World space, then converted, so an edge keeps up with a node that is
+                // being carried around by an interactor outside this hierarchy.
+                edge.Span(
+                    edge.transform.parent.InverseTransformPoint(parent.transform.position),
+                    edge.transform.parent.InverseTransformPoint(child.transform.position),
+                    NodeRadius);
             }
         }
 

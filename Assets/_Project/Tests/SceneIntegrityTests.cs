@@ -215,6 +215,53 @@ namespace Pivot.Tests
             }
         }
 
+        /// <summary>
+        /// Ids are what let the view reconcile against a model. They became serialised
+        /// fields after the scene was authored, so every view sat at id 0 and TreeView
+        /// adopted nothing at all — silently, because a tree that never changes looks
+        /// identical either way.
+        /// </summary>
+        [Test]
+        public void AuthoredViewsCarryTheirModelIds()
+        {
+            List<NodeView> nodes = FindAll<NodeView>(_scene);
+            Assert.Greater(nodes.Count, 0);
+
+            HashSet<int> seen = new HashSet<int>();
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                Assert.AreNotEqual(0, nodes[i].NodeId,
+                    "'" + nodes[i].name + "' has no model id, so nothing can reconcile it.");
+                Assert.IsTrue(seen.Add(nodes[i].NodeId),
+                    "Two nodes share id " + nodes[i].NodeId + ".");
+            }
+
+            List<EdgeView> edges = FindAll<EdgeView>(_scene);
+            for (int i = 0; i < edges.Count; i++)
+            {
+                Assert.AreNotEqual(0, edges[i].ParentId, "'" + edges[i].name + "' has no parent id.");
+                Assert.AreNotEqual(0, edges[i].ChildId, "'" + edges[i].name + "' has no child id.");
+                Assert.Contains(edges[i].ParentId, new List<int>(seen), "Edge points at a missing node.");
+                Assert.Contains(edges[i].ChildId, new List<int>(seen), "Edge points at a missing node.");
+            }
+        }
+
+        /// <summary>
+        /// CharacterController defaults minMoveDistance to 0.001 m and DISCARDS any move
+        /// shorter than that. At a high frame rate a normal walking speed produces
+        /// per-frame steps below the threshold, so the rig crawls while its velocity
+        /// reads as correct — which is exactly how this hid.
+        /// </summary>
+        [Test]
+        public void TheRigDoesNotDiscardSmallMoves()
+        {
+            List<CharacterController> controllers = FindAll<CharacterController>(_scene);
+            Assert.AreEqual(1, controllers.Count, "Expected one CharacterController on the rig.");
+
+            Assert.AreEqual(0f, controllers[0].minMoveDistance, 0.0001f,
+                "minMoveDistance must be 0, or fast frames move the rig nowhere.");
+        }
+
         [Test]
         public void SceneHasNoMissingScripts()
         {

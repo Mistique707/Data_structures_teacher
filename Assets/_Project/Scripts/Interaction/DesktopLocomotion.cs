@@ -1,41 +1,60 @@
 using Pivot.Utils;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace Pivot.Interaction
 {
     /// <summary>
-    /// Walking and looking on desktop. Tuned to feel like standing in a room rather than
-    /// flying: acceleration and braking are short but not instant, so a tap of W nudges
-    /// and a held W settles at a walking pace, and stopping does not skid.
+    /// Walking and looking on desktop.
     ///
-    /// Mouse look is frame-rate independent by construction. Mouse delta is already a
-    /// per-frame displacement, so it must NOT be multiplied by deltaTime — doing that is
-    /// the usual reason look speed changes with frame rate.
+    /// Three things here were wrong in the first version and are worth stating, because
+    /// each was a wrong model rather than a wrong number:
+    ///
+    /// - Vertical movement was a free-fly axis, so Space climbed and stayed climbed and
+    ///   Ctrl sank into the floor. It is now a crouch and a stretch: an offset from
+    ///   standing eye height that springs back the moment the key is released. There is
+    ///   no way to end up hovering, because height is not integrated, it is a target.
+    /// - The cursor started unlocked and mouse look needed a modifier held. That is not
+    ///   what anyone expects on pressing Play. The cursor is captured at start, the mouse
+    ///   always looks, Esc gives it back, and a click takes it again.
+    /// - Movement wrote straight to the transform, so there was nothing to collide with.
+    ///   It goes through a CharacterController now.
     /// </summary>
+    [RequireComponent(typeof(CharacterController))]
     [DefaultExecutionOrder(-10)]
     public sealed class DesktopLocomotion : MonoBehaviour
     {
         [Header("Rig")]
-        [Tooltip("Yaw is applied here; pitch is applied to the camera so the body never tilts.")]
-        [SerializeField] Transform _body;
+        [Tooltip("Yaw is applied to this object; pitch to the head, so the body never tilts.")]
         [SerializeField] Transform _head;
 
         [Header("Movement")]
         [Tooltip("Metres per second at a walk.")]
-        [SerializeField] float _walkSpeed = 2.6f;
+        [SerializeField] float _walkSpeed = 3.2f;
 
         [Tooltip("Multiplier while Sprint is held.")]
-        [SerializeField] float _sprintMultiplier = 2.1f;
-
-        [Tooltip("Vertical metres per second on Space and Ctrl.")]
-        [SerializeField] float _elevateSpeed = 1.8f;
+        [SerializeField] float _sprintMultiplier = 2f;
 
         [Tooltip("Seconds to reach full speed. Small, or it feels like ice.")]
         [SerializeField, Range(0.01f, 0.5f)] float _accelerationTime = 0.09f;
 
-        [Tooltip("Seconds to stop. Slightly shorter than acceleration so it feels planted.")]
+        [Tooltip("Seconds to stop. Shorter than acceleration, which reads as planted.")]
         [SerializeField, Range(0.01f, 0.5f)] float _brakingTime = 0.06f;
+
+        [Tooltip("Downward speed applied when unsupported. Keeps the rig on the floor.")]
+        [SerializeField] float _gravity = 9.81f;
+
+        [Header("Stance")]
+        [Tooltip("Eye height when standing normally.")]
+        [SerializeField] float _standingEyeHeight = 1.6f;
+
+        [Tooltip("How far the eyes drop while crouch is held.")]
+        [SerializeField] float _crouchDrop = 0.55f;
+
+        [Tooltip("How far the eyes rise while the raise key is held.")]
+        [SerializeField] float _stretchRise = 0.28f;
+
+        [Tooltip("Seconds for the stance to settle. This is the spring back.")]
+        [SerializeField, Range(0.02f, 0.6f)] float _stanceSettle = 0.12f;
 
         [Header("Look")]
         [Tooltip("Degrees per mouse count. The Settings slider scales this.")]
@@ -44,37 +63,38 @@ namespace Pivot.Interaction
         [SerializeField] float _minPitch = -85f;
         [SerializeField] float _maxPitch = 85f;
 
-        [Header("Bounds")]
-        [Tooltip("Keeps the user inside the lab. Generous; it is a nudge, not a cage.")]
-        [SerializeField] Vector3 _roomHalfExtents = new Vector3(4.5f, 0f, 4.5f);
-
-        [SerializeField] float _minHeight = 0.6f;
-        [SerializeField] float _maxHeight = 2.6f;
-
+        CharacterController _controller;
         Vector3 _velocity;
+        float _fallSpeed;
         float _yaw;
         float _pitch;
-        bool _mouseLookLatched;
+        float _eyeHeight;
+        float _eyeVelocity;
 
-        // Test-driven input. Null in normal play, in which case the actions asset is
-        // read as usual. Exists so a PlayMode test can prove the movement path works
-        // end to end without synthesising device events.
         Vector2? _forcedMove;
         float _forcedLift;
 
-        /// <summary>True while the mouse is actually steering the view.</summary>
-        public bool Looking { get; private set; }
+        /// <summary>True while the mouse is steering the view.</summary>
+        public bool Looking
+        {
+            get { return Cursor.lockState == CursorLockMode.Locked; }
+        }
+
+        void Awake()
+        {
+            _controller = GetComponent<CharacterController>();
+            if (_head == null) _head = transform;
+            _eyeHeight = _standingEyeHeight;
+        }
 
         void Start()
         {
-            if (_body == null) _body = transform;
-            if (_head == null) _head = transform;
-
-            Vector3 angles = _body.eulerAngles;
-            _yaw = angles.y;
+            _yaw = transform.eulerAngles.y;
             _pitch = NormalisePitch(_head.localEulerAngles.x);
 
-            SetCursor(false);
+            // Captured on Play, because that is what pressing Play into a first person
+            // view is expected to do.
+            SetCursor(true);
         }
 
         void OnDisable()
@@ -89,6 +109,7 @@ namespace Pivot.Interaction
 
             HandleCursor(actions);
             HandleLook(actions);
+            HandleStance(actions);
             HandleMove(actions);
         }
 
@@ -96,28 +117,21 @@ namespace Pivot.Interaction
 
         void HandleCursor(PivotActions actions)
         {
-            // Two ways in, because both are habits people already have: hold the right
-            // button for a quick glance, or latch with Tab for a long look.
-            if (actions.ToggleLook != null && actions.ToggleLook.WasPressedThisFrame())
-            {
-                _mouseLookLatched = !_mouseLookLatched;
-                SetCursor(_mouseLookLatched);
-            }
-
-            // Esc always gives the cursor back. It is the one key that must never be
-            // ambiguous, so it is checked before anything else can claim it.
+            // Esc is the one key that must never be ambiguous: it always gives the
+            // cursor back, whatever else is happening.
             if (actions.Menu != null && actions.Menu.WasPressedThisFrame())
             {
-                _mouseLookLatched = false;
                 SetCursor(false);
+                return;
             }
 
-            bool holding = actions.HoldLook != null && actions.HoldLook.IsPressed();
-            Looking = _mouseLookLatched || holding;
-
-            if (holding && Cursor.lockState != CursorLockMode.Locked) SetCursor(true);
-            else if (!Looking && !_mouseLookLatched && Cursor.lockState == CursorLockMode.Locked)
-                SetCursor(false);
+            // Clicking back into the view recaptures it. Grab is on the same button, but
+            // a click that recaptures should not also grab, so this consumes it.
+            if (Cursor.lockState != CursorLockMode.Locked &&
+                actions.Grab != null && actions.Grab.WasPressedThisFrame())
+            {
+                SetCursor(true);
+            }
         }
 
         static void SetCursor(bool locked)
@@ -137,17 +151,42 @@ namespace Pivot.Interaction
 
             float sensitivity = _lookSensitivity * Settings.MouseSensitivity;
 
-            // No deltaTime here on purpose: mouse delta is already per-frame movement.
+            // No deltaTime: mouse delta is already a per-frame displacement, and scaling
+            // it by frame time is the usual reason look speed drifts with frame rate.
             _yaw += delta.x * sensitivity;
             _pitch = Mathf.Clamp(_pitch - delta.y * sensitivity, _minPitch, _maxPitch);
 
-            _body.rotation = Quaternion.Euler(0f, _yaw, 0f);
+            transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
             _head.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
         }
 
         static float NormalisePitch(float angle)
         {
             return angle > 180f ? angle - 360f : angle;
+        }
+
+        // ----------------------------------------------------------------- stance
+
+        /// <summary>
+        /// Eye height is a target that is smoothed towards, never an accumulated value.
+        /// Release the key and it returns to standing on its own; there is no state to
+        /// get stuck in.
+        /// </summary>
+        void HandleStance(PivotActions actions)
+        {
+            float lift = _forcedMove.HasValue
+                ? _forcedLift
+                : (actions.Elevate != null ? actions.Elevate.ReadValue<float>() : 0f);
+
+            float target = _standingEyeHeight;
+            if (lift > 0.01f) target += _stretchRise * lift;
+            else if (lift < -0.01f) target += _crouchDrop * lift;
+
+            _eyeHeight = Mathf.SmoothDamp(_eyeHeight, target, ref _eyeVelocity, _stanceSettle);
+
+            Vector3 local = _head.localPosition;
+            local.y = _eyeHeight;
+            _head.localPosition = local;
         }
 
         // ------------------------------------------------------------------- move
@@ -161,76 +200,87 @@ namespace Pivot.Interaction
 
         void HandleMove(PivotActions actions)
         {
+            // Moving a disabled controller logs an error rather than doing nothing, and
+            // the controller is legitimately off for a frame whenever Frame() teleports.
+            if (_controller == null || !_controller.enabled) return;
+
             Vector2 input = _forcedMove ?? (actions.Move != null
                 ? actions.Move.ReadValue<Vector2>()
                 : Vector2.zero);
 
-            float lift = _forcedMove.HasValue
-                ? _forcedLift
-                : (actions.Elevate != null ? actions.Elevate.ReadValue<float>() : 0f);
             bool sprinting = actions.Sprint != null && actions.Sprint.IsPressed();
-
             float speed = _walkSpeed * (sprinting ? _sprintMultiplier : 1f);
 
             // Movement follows where you are looking horizontally, not where the camera
             // is pitched: looking at the floor should not walk you into it.
-            Vector3 forward = _body.forward;
+            Vector3 forward = transform.forward;
             forward.y = 0f;
             forward.Normalize();
 
-            Vector3 right = _body.right;
+            Vector3 right = transform.right;
             right.y = 0f;
             right.Normalize();
 
-            Vector3 wanted = (forward * input.y + right * input.x);
+            Vector3 wanted = forward * input.y + right * input.x;
             if (wanted.sqrMagnitude > 1f) wanted.Normalize();
             wanted *= speed;
-            wanted.y = lift * _elevateSpeed;
 
-            // Braking is quicker than acceleration, which is what reads as "planted"
-            // rather than floaty. Both are short enough to feel direct.
             float smoothing = wanted.sqrMagnitude > 0.0001f ? _accelerationTime : _brakingTime;
             float rate = 1f - Mathf.Exp(-Time.deltaTime / Mathf.Max(smoothing, 0.001f));
             _velocity = Vector3.Lerp(_velocity, wanted, rate);
 
-            if (_velocity.sqrMagnitude < 1e-6f) return;
+            // Just enough gravity to stay on the floor and walk down a step. The lab is
+            // flat, so this is about never floating rather than about falling.
+            if (_controller.isGrounded && _fallSpeed < 0f) _fallSpeed = -1f;
+            else _fallSpeed -= _gravity * Time.deltaTime;
 
-            Vector3 position = _body.position + _velocity * Time.deltaTime;
+            Vector3 motion = _velocity;
+            motion.y = _fallSpeed;
 
-            position.x = Mathf.Clamp(position.x, -_roomHalfExtents.x, _roomHalfExtents.x);
-            position.z = Mathf.Clamp(position.z, -_roomHalfExtents.z, _roomHalfExtents.z);
-            position.y = Mathf.Clamp(position.y, _minHeight, _maxHeight);
-
-            _body.position = position;
+            _controller.Move(motion * Time.deltaTime);
         }
 
         /// <summary>
-        /// Pulls back and centres on a bounds. Used by Frame Tree so the user can always
-        /// recover a sensible view without hunting for it.
+        /// Pulls back and centres on a bounds. Frame Tree uses this so the user can
+        /// always recover a sensible view without hunting for it.
         /// </summary>
         public void Frame(Bounds bounds, float fieldOfView)
         {
             float radius = Mathf.Max(bounds.extents.magnitude, 0.25f);
             float distance = radius / Mathf.Tan(fieldOfView * 0.5f * Mathf.Deg2Rad);
-            distance = Mathf.Clamp(distance * 1.25f, 1.1f, 6f);
+            distance = Mathf.Clamp(distance * 1.3f, 1.2f, 6f);
 
             Vector3 target = bounds.center;
-            Vector3 direction = new Vector3(0f, 0f, -1f);
+            Vector3 stand = target + new Vector3(0f, 0f, -1f) * distance;
+            stand.y = 0f;
 
-            Vector3 position = target + direction * distance;
-            position.y = Mathf.Clamp(target.y + 0.12f, _minHeight, _maxHeight);
+            // CharacterController owns the position, so it has to be disabled for a
+            // teleport or it fights the move and lands somewhere else.
+            bool wasEnabled = _controller != null && _controller.enabled;
+            if (wasEnabled) _controller.enabled = false;
+            transform.position = stand;
+            if (wasEnabled) _controller.enabled = true;
 
-            _body.position = position;
+            Vector3 eye = stand + Vector3.up * _eyeHeight;
+            Vector3 toTarget = target - eye;
 
-            Vector3 toTarget = target - (_body.position + Vector3.up * (_head.localPosition.y));
             _yaw = Quaternion.LookRotation(new Vector3(toTarget.x, 0f, toTarget.z)).eulerAngles.y;
             _pitch = Mathf.Clamp(
                 -Mathf.Atan2(toTarget.y, new Vector2(toTarget.x, toTarget.z).magnitude) * Mathf.Rad2Deg,
                 _minPitch, _maxPitch);
 
-            _body.rotation = Quaternion.Euler(0f, _yaw, 0f);
+            transform.rotation = Quaternion.Euler(0f, _yaw, 0f);
             _head.localRotation = Quaternion.Euler(_pitch, 0f, 0f);
+
             _velocity = Vector3.zero;
+            _fallSpeed = 0f;
         }
+
+#if UNITY_EDITOR
+        public void EditorBind(Transform head)
+        {
+            _head = head;
+        }
+#endif
     }
 }

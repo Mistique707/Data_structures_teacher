@@ -69,14 +69,39 @@ namespace Pivot.Interaction
             base.PreprocessInteractor(updatePhase);
         }
 
+        /// <summary>
+        /// Overrides the Grab signal for a test. Null in normal play, in which case the
+        /// actions asset is read as usual. Exists so a PlayMode test can perform a real
+        /// grab without synthesising device events.
+        /// </summary>
+        public void ForceGrabForTest(bool? pressed)
+        {
+            _forcedGrab = pressed;
+        }
+
+        bool? _forcedGrab;
+        bool _lastQueued;
+        bool _hasQueued;
+
         void AimAtCursor()
         {
             PivotActions actions = PivotActions.Instance;
 
-            if (actions != null && actions.Grab != null)
+            bool? grabbing = _forcedGrab;
+            if (!grabbing.HasValue && actions != null && actions.Grab != null)
             {
-                bool performed = actions.Grab.IsPressed();
-                selectInput.QueueManualState(performed, performed ? 1f : 0f);
+                grabbing = actions.Grab.IsPressed();
+            }
+
+            // Only on a change, never every frame. QueueManualState makes the value
+            // effective on frameCount + 1, so re-queuing the same state every frame
+            // pushes that target forward forever and it never lands: the button reads
+            // as never pressed no matter how long it is held.
+            if (grabbing.HasValue && (!_hasQueued || grabbing.Value != _lastQueued))
+            {
+                selectInput.QueueManualState(grabbing.Value, grabbing.Value ? 1f : 0f);
+                _lastQueued = grabbing.Value;
+                _hasQueued = true;
             }
 
             if (actions != null && actions.Push != null && hasSelection)
