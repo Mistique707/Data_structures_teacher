@@ -21,15 +21,17 @@ namespace Pivot.VFX
         [SerializeField] Light _key;
         [SerializeField] Light _fill;
 
+        // Key from over the user's front-left shoulder, fill as a cool rim from behind
+        // so silhouettes separate from the dusk without washing out the front faces.
         [Header("Key")]
-        [SerializeField] Vector3 _keyAngles = new Vector3(48f, 152f, 0f);
+        [SerializeField] Vector3 _keyAngles = new Vector3(46f, 22f, 0f);
         [SerializeField, Range(0f, 3f)] float _keyIntensity = 1.15f;
         [SerializeField] Color _keyColour = new Color(1f, 0.94f, 0.86f);
         [SerializeField, Range(0f, 1f)] float _keyShadowStrength = 0.55f;
 
         [Header("Fill")]
-        [SerializeField] Vector3 _fillAngles = new Vector3(18f, -40f, 0f);
-        [SerializeField, Range(0f, 2f)] float _fillIntensity = 0.35f;
+        [SerializeField] Vector3 _fillAngles = new Vector3(14f, -158f, 0f);
+        [SerializeField, Range(0f, 2f)] float _fillIntensity = 0.5f;
         [SerializeField] Color _fillColour = new Color(0.62f, 0.70f, 1f);
 
         void OnEnable()
@@ -43,6 +45,18 @@ namespace Pivot.VFX
         }
 
 #if UNITY_EDITOR
+        /// <summary>
+        /// Re-aims an already authored rig. Serialised angles live in the scene, so a
+        /// changed default in this file never reaches a light that already exists.
+        /// </summary>
+        public void EditorReaim(Vector3 keyAngles, Vector3 fillAngles, float fillIntensity)
+        {
+            _keyAngles = keyAngles;
+            _fillAngles = fillAngles;
+            _fillIntensity = fillIntensity;
+            Apply();
+        }
+
         /// <summary>Used by the scene authoring tool. Editor only, never at run time.</summary>
         public void EditorBind(ThemeSO theme, Light key, Light fill)
         {
