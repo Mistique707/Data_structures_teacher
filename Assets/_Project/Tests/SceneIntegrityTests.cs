@@ -20,6 +20,13 @@ namespace Pivot.Tests
     ///
     /// The scene is opened additively and closed again so running the suite inside the
     /// Editor does not disturb whatever the developer had open.
+    ///
+    /// These check the scene as Unity loads it, which is the right level for structure:
+    /// counts, names, wiring, missing references. It is the wrong level for authored
+    /// data, because components here are [ExecuteAlways] and can repair themselves on
+    /// load — a live transform check would pass even if the file held nothing. Anything
+    /// about what was actually saved belongs in <see cref="SceneFileTests"/>, which
+    /// reads the .unity as text.
     /// </summary>
     public class SceneIntegrityTests
     {
@@ -176,9 +183,8 @@ namespace Pivot.Tests
         }
 
         /// <summary>
-        /// A MaterialPropertyBlock is not serialised into a scene, so an authored
-        /// colour has to live in a serialised field and be restored on wake. This
-        /// caught every node reloading as the same fallback blue.
+        /// Reads a serialised field, so this does reflect the file. The stronger check
+        /// on the raw YAML lives in SceneFileTests.SceneFileRecordsDistinctDepthColours.
         /// </summary>
         [Test]
         public void AuthoredNodesKeepDistinctDepthColours()
@@ -194,8 +200,11 @@ namespace Pivot.Tests
         }
 
         /// <summary>
-        /// The number is the product. If the label pivot sits at the node centre it is
-        /// inside the sphere and invisible until something billboards it at run time.
+        /// Confirms the label ends up outside the bubble once the scene is loaded. Note
+        /// what this does not prove: NodeView is [ExecuteAlways] and parks the pivot in
+        /// OnEnable, so this would pass even on a scene file that saved the label at the
+        /// node centre. SceneFileTests.SceneFileRecordsLabelPivotsOutsideTheirBubbles is
+        /// the test that actually guards the saved data.
         /// </summary>
         [Test]
         public void AuthoredNodeLabelsSitOutsideTheirBubbles()

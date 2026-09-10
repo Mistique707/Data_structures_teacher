@@ -34,9 +34,6 @@ namespace Pivot.Structures
         [Tooltip("Serialised so the authored scene keeps its depth colour without Play.")]
         [SerializeField] Color _colour = Color.white;
 
-        [Tooltip("Resting offset of the label towards the viewer, before billboarding.")]
-        [SerializeField] Vector3 _labelOffset = new Vector3(0f, 0f, -0.154f);
-
         static readonly int InstanceColour = Shader.PropertyToID("_InstanceColour");
         static readonly int InstanceHighlight = Shader.PropertyToID("_InstanceHighlight");
 
@@ -74,7 +71,6 @@ namespace Pivot.Structures
         {
             EnsureReady();
             PushBlock();
-            RestLabel();
         }
 
 #if UNITY_EDITOR
@@ -82,17 +78,8 @@ namespace Pivot.Structures
         {
             EnsureReady();
             PushBlock();
-            RestLabel();
         }
 #endif
-
-        /// <summary>Park the label just in front of the bubble so it reads without billboarding.</summary>
-        void RestLabel()
-        {
-            if (_labelPivot == null) return;
-            _labelPivot.localPosition = _labelOffset;
-            _labelPivot.localRotation = Quaternion.identity;
-        }
 
         void Awake()
         {
