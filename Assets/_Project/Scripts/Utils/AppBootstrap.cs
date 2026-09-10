@@ -6,8 +6,9 @@ namespace Pivot.Utils
 {
     /// <summary>
     /// Runs once at startup: loads settings, pins the frame rate, and turns on fixed
-    /// foveated rendering if a headset is actually present. Lives on a small object
-    /// in the title scene and survives into the lab.
+    /// foveated rendering if a headset is actually present. Authored under the scene's
+    /// Systems group and promotes itself to a root object at runtime, because
+    /// DontDestroyOnLoad refuses anything that has a parent.
     /// </summary>
     [DefaultExecutionOrder(-100)]
     public sealed class AppBootstrap : MonoBehaviour
@@ -42,6 +43,9 @@ namespace Pivot.Utils
             }
 
             _instance = this;
+
+            // Runtime reparenting only. The saved scene keeps this under its group.
+            transform.SetParent(null, true);
             DontDestroyOnLoad(gameObject);
 
             Settings.Load(_config);

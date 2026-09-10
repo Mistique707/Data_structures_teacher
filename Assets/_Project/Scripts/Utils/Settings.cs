@@ -21,12 +21,16 @@ namespace Pivot.Utils
 
         static bool _loaded;
 
-        static RigMode _rig;
-        static EnvironmentMode _environment;
-        static float _animationSpeed;
-        static ParticleDensity _particles;
-        static float _masterVolume;
-        static float _mouseSensitivity;
+        // Initialised to the same fallbacks Load() uses, so a scene that runs before
+        // anything has called Load() gets sane values rather than zeros. A zero mouse
+        // sensitivity here once disabled mouse look entirely while every other control
+        // kept working, which is exactly the kind of failure that hides.
+        static RigMode _rig = RigMode.Auto;
+        static EnvironmentMode _environment = EnvironmentMode.Skybox;
+        static float _animationSpeed = 1f;
+        static ParticleDensity _particles = ParticleDensity.Medium;
+        static float _masterVolume = 0.8f;
+        static float _mouseSensitivity = 1f;
         static bool _leftHanded;
 
         /// <summary>Fired whenever any value changes, including on the initial load.</summary>
