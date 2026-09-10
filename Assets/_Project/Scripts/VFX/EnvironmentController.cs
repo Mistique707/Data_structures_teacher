@@ -68,7 +68,10 @@ namespace Pivot.VFX
 
         void Start()
         {
-            PushThemeToSkybox();
+            // Deliberately does not push theme colours into the skybox material. That
+            // material is a shared project asset, and writing to it here would overwrite
+            // a hand tweak on every scene load and persist past Play in the Editor.
+            // See ARCHITECTURE.md, rule 1.
             if (_camera == null) Bind(Camera.main);
             Apply(Settings.IsLoaded ? Settings.Environment : EnvironmentMode.Skybox, true);
         }
@@ -157,7 +160,11 @@ namespace Pivot.VFX
             DynamicGI.UpdateEnvironment();
         }
 
-        /// <summary>Copies the theme's sky colours onto the skybox material.</summary>
+        /// <summary>
+        /// Copies the theme's sky colours onto the skybox material asset. Invoked by
+        /// hand when the theme changes and the material should follow; never automatic.
+        /// </summary>
+        [ContextMenu("Push Theme To Skybox")]
         public void PushThemeToSkybox()
         {
             if (_theme == null || _skyboxMaterial == null) return;
@@ -167,11 +174,5 @@ namespace Pivot.VFX
             _skyboxMaterial.SetColor(GroundColour, _theme.SkyGround);
         }
 
-#if UNITY_EDITOR
-        void OnValidate()
-        {
-            if (!Application.isPlaying) PushThemeToSkybox();
-        }
-#endif
     }
 }

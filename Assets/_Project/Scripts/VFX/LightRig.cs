@@ -12,6 +12,10 @@ namespace Pivot.VFX
     ///
     /// The fill is a second directional rather than a point light so it costs nothing
     /// extra per object and never falls off across the workbench.
+    ///
+    /// This is an authoring convenience, not a runtime system. The authored values live
+    /// on the Light components in the scene; Apply is invoked deliberately from the
+    /// context menu to push these settings onto them. It never runs on its own.
     /// </summary>
     [ExecuteAlways]
     public sealed class LightRig : MonoBehaviour
@@ -34,15 +38,6 @@ namespace Pivot.VFX
         [SerializeField, Range(0f, 2f)] float _fillIntensity = 0.5f;
         [SerializeField] Color _fillColour = new Color(0.62f, 0.70f, 1f);
 
-        void OnEnable()
-        {
-            Apply();
-        }
-
-        void OnValidate()
-        {
-            Apply();
-        }
 
 #if UNITY_EDITOR
         /// <summary>
@@ -66,6 +61,13 @@ namespace Pivot.VFX
         }
 #endif
 
+        /// <summary>
+        /// Writes these settings onto the two Light components. Deliberately NOT called
+        /// from OnEnable or OnValidate: that would overwrite a light someone had aimed
+        /// by hand every time the scene opened, and would make the scene file stop being
+        /// the source of truth. See ARCHITECTURE.md, rule 1.
+        /// </summary>
+        [ContextMenu("Apply To Lights")]
         public void Apply()
         {
             if (_key != null)
