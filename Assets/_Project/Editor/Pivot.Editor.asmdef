@@ -11,7 +11,8 @@
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.Universal.Editor",
         "Unity.ProBuilder",
-        "Unity.ProBuilder.Editor"
+        "Unity.ProBuilder.Editor",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"

@@ -1,21 +1,17 @@
 {
-    "name": "Pivot.Tests",
-    "rootNamespace": "Pivot.Tests",
+    "name": "Pivot.PlayTests",
+    "rootNamespace": "Pivot.PlayTests",
     "references": [
         "Pivot.Core",
         "Pivot.Runtime",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Unity.RenderPipelines.Core.Runtime",
-        "Unity.RenderPipelines.Universal.Runtime",
-        "Unity.XR.OpenXR",
-        "Unity.TextMeshPro",
         "Unity.InputSystem",
-        "Unity.XR.Interaction.Toolkit"
+        "Unity.XR.Interaction.Toolkit",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

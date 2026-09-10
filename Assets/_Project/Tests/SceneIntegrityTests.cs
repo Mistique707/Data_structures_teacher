@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using Pivot.Interaction;
 using Pivot.Structures;
 using Pivot.VFX;
 using UnityEditor;
@@ -133,13 +134,85 @@ namespace Pivot.Tests
         [Test]
         public void SceneHasACameraALightRigAndAnEnvironmentController()
         {
-            Assert.AreEqual(1, FindAll<Camera>(_scene).Count, "Expected exactly one camera.");
             Assert.AreEqual(1, FindAll<LightRig>(_scene).Count, "Expected exactly one light rig.");
             Assert.AreEqual(1, FindAll<EnvironmentController>(_scene).Count,
                 "Expected exactly one environment controller.");
 
             List<Light> lights = FindAll<Light>(_scene);
             Assert.AreEqual(2, lights.Count, "Expected a key and a fill, and nothing else.");
+        }
+
+        /// <summary>
+        /// Exactly one rig, present in the committed scene and already enabled. Not a
+        /// prefab to drag in, and never both at once: two active rigs means two cameras
+        /// and two audio listeners, which fails quietly rather than loudly.
+        /// </summary>
+        [Test]
+        public void ExactlyOneRigIsPresentAndEnabled()
+        {
+            List<RigManager> managers = FindAll<RigManager>(_scene);
+            Assert.AreEqual(1, managers.Count, "Expected exactly one RigManager.");
+
+            List<DesktopLocomotion> desktop = FindAll<DesktopLocomotion>(_scene);
+            Assert.AreEqual(1, desktop.Count, "Expected exactly one desktop rig.");
+
+            int activeRigs = 0;
+            if (desktop[0].gameObject.activeInHierarchy) activeRigs++;
+
+            foreach (GameObject root in _scene.GetRootGameObjects())
+            {
+                Transform vr = root.transform.Find("VRRig");
+                if (vr != null && vr.gameObject.activeInHierarchy) activeRigs++;
+            }
+
+            Assert.AreEqual(1, activeRigs,
+                "Exactly one rig must be enabled in the saved scene; found " + activeRigs + ".");
+        }
+
+        [Test]
+        public void TheSceneHasExactlyOneCameraAndOneAudioListener()
+        {
+            int cameras = 0;
+            int listeners = 0;
+
+            foreach (GameObject root in _scene.GetRootGameObjects())
+            {
+                foreach (Camera camera in root.GetComponentsInChildren<Camera>(true))
+                {
+                    if (camera.gameObject.activeInHierarchy) cameras++;
+                }
+
+                foreach (AudioListener listener in root.GetComponentsInChildren<AudioListener>(true))
+                {
+                    if (listener.gameObject.activeInHierarchy) listeners++;
+                }
+            }
+
+            Assert.AreEqual(1, cameras, "Expected one active camera, found " + cameras + ".");
+            Assert.AreEqual(1, listeners, "Expected one active audio listener, found " + listeners + ".");
+        }
+
+        [Test]
+        public void InputGoesThroughTheActionsAsset()
+        {
+            List<PivotActions> actions = FindAll<PivotActions>(_scene);
+            Assert.AreEqual(1, actions.Count, "Expected exactly one PivotActions in the scene.");
+            Assert.IsNotNull(actions[0].Asset,
+                "PivotActions has no Input Actions asset assigned, so nothing is bound.");
+        }
+
+        [Test]
+        public void NodesAreGrabbable()
+        {
+            List<NodeView> nodes = FindAll<NodeView>(_scene);
+            Assert.Greater(nodes.Count, 0);
+
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                Assert.IsNotNull(
+                    nodes[i].GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>(),
+                    "'" + nodes[i].name + "' has no XRGrabInteractable, so no rig can pick it up.");
+            }
         }
 
         [Test]
@@ -236,8 +309,9 @@ namespace Pivot.Tests
             Assert.Contains("--- Environment ---", roots);
             Assert.Contains("--- Tree ---", roots);
             Assert.Contains("--- Systems ---", roots);
+            Assert.Contains("--- Rig ---", roots);
 
-            Assert.AreEqual(3, roots.Count,
+            Assert.AreEqual(4, roots.Count,
                 "Only the named group parents belong at the root of the scene.");
         }
     }

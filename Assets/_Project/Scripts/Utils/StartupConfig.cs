@@ -10,6 +10,18 @@ namespace Pivot.Utils
         ForceDesktop
     }
 
+    /// <summary>
+    /// Which rig actually won at boot. Deliberately separate from <see cref="RigMode"/>:
+    /// that one is the authored preference and carries an Auto that means "decide", so
+    /// it cannot also express a decision. Keeping them apart is what stops Auto leaking
+    /// into code that has to know the answer.
+    /// </summary>
+    public enum ActiveRig
+    {
+        Desktop,
+        VR
+    }
+
     public enum EnvironmentMode
     {
         Skybox,
