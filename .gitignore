@@ -116,3 +116,6 @@ InitTestScene*.unity*
 # Batch-mode compile and test check output
 /TestResults.xml
 /[Tt]est[Rr]esults/
+
+# Coursework documents and reviews stay local
+*.pdf
